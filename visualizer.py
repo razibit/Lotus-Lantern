@@ -16,6 +16,8 @@ import socket
 import time
 import sys
 import warnings
+from pathlib import Path
+import os
 
 # Suppress soundcard buffer warnings
 warnings.filterwarnings("ignore")
@@ -24,23 +26,20 @@ UDP_IP = "127.0.0.1"
 UDP_PORT = 1920
 SAMPLE_RATE = 44100
 BLOCK_SIZE = 1024
-UPDATE_RATE = 30  # frames per second
+UPDATE_RATE = 10
 
-# Smoothing factor (0-1, higher = more responsive, lower = smoother)
 SMOOTHING = 0.3
-
-# Color sensitivity (adjust if colors are too dim or too bright)
-BASS_GAIN = 1.5
-MID_GAIN = 1.2
-TREBLE_GAIN = 1.0
+MIN_BRIGHTNESS = 18
+NOISE_GATE = 0.003
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+PID_FILE = Path(__file__).with_name("visualizer.pid")
 
 
-def analyze_audio(data):
+def analyze_audio(data, band_peak):
     """Analyze audio and return (r, g, b) values 0-255."""
     if len(data) < BLOCK_SIZE:
-        return 0, 0, 0
+        return (0, 0, 0), band_peak
 
     # Mix to mono if stereo
     if data.ndim > 1:
@@ -48,8 +47,13 @@ def analyze_audio(data):
     else:
         mono = data.flatten()
 
-    # FFT
-    fft = np.abs(np.fft.rfft(mono[:BLOCK_SIZE]))
+    mono = mono[:BLOCK_SIZE]
+    rms = float(np.sqrt(np.mean(mono * mono)))
+    if rms < NOISE_GATE:
+        return (0, 0, 0), band_peak
+
+    # A Hann window prevents energy from leaking across frequency bands.
+    fft = np.abs(np.fft.rfft(mono * np.hanning(len(mono))))
     freqs = np.fft.rfftfreq(BLOCK_SIZE, 1.0 / SAMPLE_RATE)
 
     # Frequency bands
@@ -57,17 +61,27 @@ def analyze_audio(data):
     mid = fft[(freqs >= 250) & (freqs < 2000)]
     treble = fft[(freqs >= 2000) & (freqs < 8000)]
 
-    # Average magnitude per band
-    bass_val = np.mean(bass) if len(bass) > 0 else 0
-    mid_val = np.mean(mid) if len(mid) > 0 else 0
-    treble_val = np.mean(treble) if len(treble) > 0 else 0
+    levels = np.array([
+        np.sqrt(np.mean(bass * bass)) if len(bass) else 0,
+        np.sqrt(np.mean(mid * mid)) if len(mid) else 0,
+        np.sqrt(np.mean(treble * treble)) if len(treble) else 0,
+    ])
 
-    # Normalize to 0-255 with gains
-    r = int(min(255, bass_val * BASS_GAIN * 255 / 50))
-    g = int(min(255, mid_val * MID_GAIN * 255 / 50))
-    b = int(min(255, treble_val * TREBLE_GAIN * 255 / 50))
+    band_peak = np.maximum(levels, band_peak * 0.96)
+    normalized = np.divide(
+        levels, band_peak, out=np.zeros_like(levels), where=band_peak > 1e-9
+    )
+    strongest = float(np.max(levels))
+    if strongest > 0:
+        normalized *= levels / strongest
+    normalized = np.sqrt(np.clip(normalized, 0, 1))
+    rgb = np.where(
+        normalized > 0.03,
+        MIN_BRIGHTNESS + normalized * (255 - MIN_BRIGHTNESS),
+        0,
+    )
 
-    return r, g, b
+    return tuple(rgb.astype(int)), band_peak
 
 
 def send_color(r, g, b):
@@ -77,7 +91,9 @@ def send_color(r, g, b):
 
 
 def main():
+    PID_FILE.write_text(str(os.getpid()), encoding="ascii")
     prev_r, prev_g, prev_b = 0, 0, 0
+    band_peak = np.full(3, 1e-6)
 
     print("=" * 50)
     print("  LOTUS LANTERN - AUDIO VISUALIZER")
@@ -122,9 +138,8 @@ def main():
 
                     data = mic.record(numframes=BLOCK_SIZE)
 
-                    r, g, b = analyze_audio(data)
+                    (r, g, b), band_peak = analyze_audio(data, band_peak)
 
-                    # Smooth transitions
                     r = int(prev_r + SMOOTHING * (r - prev_r))
                     g = int(prev_g + SMOOTHING * (g - prev_g))
                     b = int(prev_b + SMOOTHING * (b - prev_b))
@@ -144,6 +159,8 @@ def main():
             print("\n\nStopped. Turning off LED...")
             send_color(0, 0, 0)
             sock.close()
+        finally:
+            PID_FILE.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

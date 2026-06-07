@@ -12,7 +12,10 @@ cd /d "%~dp0"
 :: Kill any leftover processes
 echo [1/4] Cleaning up old processes...
 taskkill /f /im BLEServer.exe >nul 2>&1
-taskkill /f /im "node.exe" /fi "WINDOWTITLE eq Lotus*" >nul 2>&1
+if exist "connector.pid" (
+    for /f "usebackq tokens=1" %%P in ("connector.pid") do taskkill /f /pid %%P >nul 2>&1
+    del /q connector.pid >nul 2>&1
+)
 
 :: Install dependencies if node_modules missing
 if not exist "node_modules\noble-winrt" (
@@ -33,7 +36,7 @@ echo.
 echo ============================================
 echo   LED Strip: BE27BA000D79 (ELK-BLEDDM)
 echo   UDP Server: localhost:1920
-echo   OpenRGB: Set UDP device to 127.0.0.1:1920
+echo   OpenRGB: Use start-openrgb-ble-sync.cmd
 echo ============================================
 echo.
 echo Waiting for Bluetooth connection...

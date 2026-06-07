@@ -7,12 +7,24 @@ echo ====================================================
 echo       LOTUS LANTERN - ONE-CLICK MUSIC SYNC
 echo ====================================================
 echo.
+echo NOTE: OpenRGB does not control this BLE strip directly.
+echo       Do not configure OpenRGB Client to port 1920.
+echo.
 
 cd /d "%~dp0"
 
-:: Kill any leftover processes
+:: Stop only processes previously started by this project.
 echo [1/5] Cleaning up old processes...
+if exist "visualizer.pid" (
+    for /f "usebackq tokens=1" %%P in ("visualizer.pid") do taskkill /f /pid %%P >nul 2>&1
+    del /q visualizer.pid >nul 2>&1
+)
+if exist "connector.pid" (
+    for /f "usebackq tokens=1" %%P in ("connector.pid") do taskkill /f /pid %%P >nul 2>&1
+    del /q connector.pid >nul 2>&1
+)
 taskkill /f /im BLEServer.exe >nul 2>&1
+timeout /t 2 /nobreak >nul
 
 :: Install npm dependencies if needed
 if not exist "node_modules\noble-winrt" (
@@ -43,8 +55,8 @@ echo.
 start "Lotus LED Connector" /min cmd /c "node index.mjs BE27BA000D79"
 
 :: Wait for connection
-echo   Waiting for LED strip to connect (5s)...
-timeout /t 5 /nobreak >nul
+echo   Waiting for LED strip to connect (8s)...
+timeout /t 8 /nobreak >nul
 
 :: Start visualizer in foreground
 echo.
