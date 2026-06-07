@@ -8,6 +8,13 @@ echo ============================================
 echo.
 
 cd /d "%~dp0"
+call config.cmd
+
+if "%LED_DEVICE_UUID%"=="" (
+    echo ERROR: Set LED_DEVICE_UUID in config.cmd first.
+    pause
+    exit /b 1
+)
 
 :: Kill any leftover processes
 echo [1/4] Cleaning up old processes...
@@ -34,7 +41,7 @@ node -e "const fs=require('fs');const f='node_modules/@bjclopes/homebridge-ledst
 echo [4/4] Starting LED strip connector...
 echo.
 echo ============================================
-echo   LED Strip: BE27BA000D79 (ELK-BLEDDM)
+echo   LED Strip: %LED_DEVICE_UUID%
 echo   UDP Server: localhost:1920
 echo   OpenRGB: Use start-openrgb-ble-sync.cmd
 echo ============================================
@@ -42,6 +49,6 @@ echo.
 echo Waiting for Bluetooth connection...
 echo.
 
-node index.mjs BE27BA000D79
+node index.mjs %LED_DEVICE_UUID%
 
 pause

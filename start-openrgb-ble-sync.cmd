@@ -2,6 +2,20 @@
 title OpenRGB - Lotus Lantern BLE
 color 0B
 cd /d "%~dp0"
+call config.cmd
+
+if "%LED_DEVICE_UUID%"=="" (
+    echo ERROR: Set LED_DEVICE_UUID in config.cmd first.
+    pause
+    exit /b 1
+)
+if not exist "%OPENRGB_EXE%" (
+    echo ERROR: OpenRGB was not found at:
+    echo   %OPENRGB_EXE%
+    echo Update OPENRGB_EXE in config.cmd.
+    pause
+    exit /b 1
+)
 
 echo Starting Lotus Lantern BLE bridge...
 
@@ -13,10 +27,19 @@ taskkill /f /im BLEServer.exe >nul 2>&1
 taskkill /f /im OpenRGB.exe >nul 2>&1
 timeout /t 2 /nobreak >nul
 
-start "Lotus BLE Bridge" /min cmd /c "node index.mjs BE27BA000D79"
+echo Configuring the OpenRGB DDP device...
+node configure-openrgb.mjs
+if errorlevel 1 (
+    echo ERROR: OpenRGB configuration failed.
+    echo Start OpenRGB once, close it, and run this script again.
+    pause
+    exit /b 1
+)
+
+start "Lotus BLE Bridge" /min cmd /c "node index.mjs %LED_DEVICE_UUID%"
 timeout /t 8 /nobreak >nul
 
-start "" "C:\Program Files\OpenRGB\OpenRGB.exe" --server --server-host 127.0.0.1 --server-port 6742
+start "" "%OPENRGB_EXE%" --server --server-host 127.0.0.1 --server-port 6742
 
 echo.
 echo OpenRGB is connected through:

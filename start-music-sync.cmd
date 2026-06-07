@@ -12,6 +12,13 @@ echo       Do not configure OpenRGB Client to port 1920.
 echo.
 
 cd /d "%~dp0"
+call config.cmd
+
+if "%LED_DEVICE_UUID%"=="" (
+    echo ERROR: Set LED_DEVICE_UUID in config.cmd first.
+    pause
+    exit /b 1
+)
 
 :: Stop only processes previously started by this project.
 echo [1/5] Cleaning up old processes...
@@ -52,7 +59,7 @@ node -e "const fs=require('fs');const f='node_modules/@bjclopes/homebridge-ledst
 echo [5/5] Connecting LED strip and starting visualizer...
 echo.
 
-start "Lotus LED Connector" /min cmd /c "node index.mjs BE27BA000D79"
+start "Lotus LED Connector" /min cmd /c "node index.mjs %LED_DEVICE_UUID%"
 
 :: Wait for connection
 echo   Waiting for LED strip to connect (8s)...
@@ -61,7 +68,7 @@ timeout /t 8 /nobreak >nul
 :: Start visualizer in foreground
 echo.
 echo ====================================================
-echo   LED STRIP: Connected (BE27BA000D79)
+echo   LED STRIP: %LED_DEVICE_UUID%
 echo   AUDIO: Capturing system audio (what you hear)
 echo   SYNC: Bass=Red, Mid=Green, Treble=Blue
 echo.
