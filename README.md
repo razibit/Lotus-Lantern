@@ -3,6 +3,8 @@
 Control inexpensive Bluetooth LED strips from a Windows PC and synchronize
 them with music using either OpenRGB Effects or the included audio visualizer.
 
+![Lotus Lantern Music Sync](https://raw.githubusercontent.com/your-username/lotus-lantern/main/Alice-Deejay---Megamix---YouTube.gif)
+
 This project bridges three systems:
 
 ```text
